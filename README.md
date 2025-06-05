@@ -4,7 +4,7 @@
 
 ## ✨ 项目亮点
 
-🚀 **双平台支持** - Web浏览器 + 微信小程序  
+🚀 **多平台支持** - Web浏览器 + 微信小程序 + 微信小游戏  
 🎯 **完整游戏体验** - 射击、躲避、升级、挑战  
 🎨 **精美视觉效果** - 粒子系统、爆炸动画、动态背景  
 🎵 **沉浸式音效** - 射击音效、爆炸声效  
@@ -38,7 +38,9 @@
 │   ├── 🎮 game.js                   # 游戏引擎
 │   └── ⚙️ game_config.js            # 配置文件
 │
-├── 📱 wechat-miniprogram/           # 微信小程序版本
+├── 📱 wechat-miniprogram/           # 微信小程序版本 (原版)
+├── 👤 wechat-miniprogram-personal/  # 微信小程序版本 (个人开发者)
+├── 🎮 wechat-minigame/              # 微信小游戏版本 (企业开发者)
 │   ├── 🚀 app.js                    # 应用入口
 │   ├── ⚙️ app.json                  # 全局配置
 │   ├── 🎨 app.wxss                  # 全局样式
@@ -78,20 +80,41 @@
 - `空格键` - 射击
 - `R` - 重新开始
 
-### 📱 微信小程序版本
+### 👤 微信小程序版本 (个人开发者推荐)
+
+✅ **适合个人开发者** - 个人主体可以发布微信小程序
 
 1. **准备环境**
    - 下载微信开发者工具
-   - 注册小程序开发者账号
+   - 注册**小程序**开发者账号 (选择个人主体)
 
 2. **导入项目**
    - 打开微信开发者工具
-   - 选择 `wechat-miniprogram/` 目录
-   - 输入AppID或使用测试号
+   - 选择**小程序**项目类型
+   - 导入 `wechat-miniprogram-personal/` 目录
+   - 输入小程序AppID
 
 3. **开始游戏**
    - 点击编译运行
    - 在模拟器或真机上体验
+
+📖 **详细发布指南**: 查看 `wechat-miniprogram-personal/PERSONAL-PUBLISH-GUIDE.md`
+
+### 🎮 微信小游戏版本 (企业开发者)
+
+⚠️ **需要企业主体** - 个人开发者无法发布小游戏
+
+1. **准备环境**
+   - 下载微信开发者工具
+   - 注册**小游戏**开发者账号 (需要企业主体)
+
+2. **导入项目**
+   - 打开微信开发者工具
+   - 选择**小游戏**项目类型
+   - 导入 `wechat-minigame/` 目录
+   - 输入小游戏AppID
+
+📖 **详细发布指南**: 查看 `wechat-minigame/PUBLISH-GUIDE.md`
 
 ## 🎯 游戏玩法
 
@@ -117,11 +140,12 @@
 - **Web Audio API** - 音效播放系统
 - **CSS3** - 响应式界面设计
 
-### 微信小程序版本
-- **Canvas 2D API** - 小程序游戏渲染
-- **WXML/WXSS** - 小程序界面框架
+### 微信小游戏版本
+- **Canvas 2D API** - 高性能游戏渲染
+- **小游戏API** - 专业游戏开发接口
 - **微信API** - 本地存储、分享功能
 - **触控优化** - 移动端交互体验
+- **60FPS** - 流畅游戏体验
 
 ## 📱 兼容性
 
@@ -132,11 +156,11 @@
 ✅ Edge 79+  
 ✅ 移动端浏览器  
 
-### 📱 微信小程序
+### 🎮 微信小游戏
 ✅ iOS 微信 7.0+  
 ✅ Android 微信 7.0+  
-✅ 基础库 2.9.0+  
-✅ Canvas 2D 新接口  
+✅ 基础库 2.19.4+  
+✅ Canvas 2D 游戏引擎  
 
 ## 🔧 开发指南
 
@@ -155,9 +179,9 @@
 
 - 📖 [项目结构详解](PROJECT-STRUCTURE.md)
 - 🌐 [Web版本说明](docs/web-version-README.md)
+- 👤 [个人开发者小程序指南](wechat-miniprogram-personal/PERSONAL-PUBLISH-GUIDE.md) ⭐
+- 🎮 [企业开发者小游戏指南](wechat-minigame/PUBLISH-GUIDE.md)
 - 📱 [微信小程序说明](wechat-miniprogram/README.md)
-- 🔧 [故障排除指南](wechat-miniprogram/docs/TROUBLESHOOTING.md)
-- 🚀 [部署指南](wechat-miniprogram/docs/deploy.md)
 
 ## 📄 许可证
 

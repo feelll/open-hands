@@ -8,7 +8,9 @@ import sys
 PORT = 12000
 
 # 切换到游戏目录
-os.chdir('/workspace/space-shooter-game')
+script_dir = os.path.dirname(os.path.abspath(__file__))
+web_dir = os.path.join(script_dir, '..', 'web-version')
+os.chdir(web_dir)
 
 class MyHTTPRequestHandler(http.server.SimpleHTTPRequestHandler):
     def end_headers(self):
@@ -21,7 +23,7 @@ class MyHTTPRequestHandler(http.server.SimpleHTTPRequestHandler):
 # 创建服务器
 with socketserver.TCPServer(("0.0.0.0", PORT), MyHTTPRequestHandler) as httpd:
     print(f"太空射击游戏服务器启动在端口 {PORT}")
-    print(f"访问游戏: https://work-1-kysoqxhmfuonxamu.prod-runtime.all-hands.dev")
+    print(f"访问游戏: https://work-1-rbvknchekxhhpkmp.prod-runtime.all-hands.dev")
     print("按 Ctrl+C 停止服务器")
     
     try:

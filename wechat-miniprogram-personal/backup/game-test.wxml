@@ -1,0 +1,5 @@
+<!--pages/game/game.wxml - 测试版本-->
+<view class="container">
+  <text class="message">{{message}}</text>
+  <button bindtap="startTest">开始测试</button>
+</view>
