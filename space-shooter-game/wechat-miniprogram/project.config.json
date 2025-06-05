@@ -40,7 +40,7 @@
     }
   },
   "compileType": "miniprogram",
-  "libVersion": "2.19.4",
+  "libVersion": "3.0.2",
   "appid": "wxYourAppIdHere",
   "projectname": "space-shooter-game",
   "condition": {}

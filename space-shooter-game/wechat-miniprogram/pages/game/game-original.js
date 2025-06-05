@@ -1,4 +1,4 @@
-// pages/game/game-simple.js - 简化版本，专门针对微信小程序优化
+// pages/game/game.js
 Page({
   data: {
     score: 0,
@@ -38,9 +38,7 @@ Page({
           const ctx = canvas.getContext('2d');
           
           // 设置画布尺寸
-          const systemInfo = wx.getSystemInfoSync();
-          const dpr = systemInfo.pixelRatio || 2;
-          
+          const dpr = wx.getSystemInfoSync().pixelRatio;
           canvas.width = res[0].width * dpr;
           canvas.height = res[0].height * dpr;
           ctx.scale(dpr, dpr);
@@ -50,12 +48,20 @@ Page({
           this.canvasWidth = res[0].width;
           this.canvasHeight = res[0].height;
           
+          // 检查 requestAnimationFrame 是否可用
+          if (!this.canvas.requestAnimationFrame) {
+            console.warn('Canvas requestAnimationFrame not available, using setTimeout fallback');
+            this.canvas.requestAnimationFrame = (callback) => {
+              return setTimeout(callback, 1000 / 60); // 60 FPS
+            };
+          }
+          
           // 开始游戏
           this.startGame();
         } catch (error) {
           console.error('Canvas initialization failed:', error);
           wx.showToast({
-            title: '游戏初始化失败，请重试',
+            title: '游戏初始化失败',
             icon: 'none'
           });
         }
@@ -71,7 +77,8 @@ Page({
       gameRunning: true,
       paused: false,
       lastShot: 0,
-      shootCooldown: 200
+      shootCooldown: 200,
+      keys: {}
     };
 
     // 游戏对象数组
@@ -88,9 +95,6 @@ Page({
       left: false,
       right: false
     };
-
-    // 游戏循环ID
-    this.gameLoopId = null;
 
     this.setData({
       score: 0,
@@ -109,7 +113,7 @@ Page({
     
     // 创建星星背景
     this.stars = [];
-    for (let i = 0; i < 30; i++) { // 减少星星数量以提高性能
+    for (let i = 0; i < 50; i++) {
       this.stars.push(new Star(this.canvasWidth, this.canvasHeight));
     }
     
@@ -120,103 +124,79 @@ Page({
   gameLoop() {
     if (!this.gameState.gameRunning || this.data.paused) {
       if (this.gameState.gameRunning) {
-        // 使用 setTimeout 替代 requestAnimationFrame
-        this.gameLoopId = setTimeout(() => this.gameLoop(), 1000 / 30); // 30 FPS 以提高兼容性
+        this.canvas.requestAnimationFrame(() => this.gameLoop());
       }
       return;
     }
 
-    try {
-      // 清空画布
-      this.ctx.clearRect(0, 0, this.canvasWidth, this.canvasHeight);
+    // 清空画布
+    this.ctx.clearRect(0, 0, this.canvasWidth, this.canvasHeight);
 
-      // 绘制星星背景
-      this.updateStars();
-
-      // 更新和绘制玩家
-      if (this.player) {
-        this.player.update(this.moveState, this.canvasWidth, this.canvasHeight);
-        this.player.draw(this.ctx);
-      }
-
-      // 生成敌人
-      this.spawnEnemies();
-
-      // 更新游戏对象
-      this.updateEnemies();
-      this.updateBullets();
-      this.updateExplosions();
-
-      // 检查碰撞
-      this.checkCollisions();
-
-      // 更新等级
-      if (this.gameState.score > this.gameState.level * 500) {
-        this.gameState.level++;
-        this.setData({ level: this.gameState.level });
-      }
-
-      // 更新UI（减少频率以提高性能）
-      if (Date.now() % 5 === 0) {
-        this.setData({
-          score: this.gameState.score,
-          lives: this.gameState.lives
-        });
-      }
-
-    } catch (error) {
-      console.error('Game loop error:', error);
-    }
-
-    // 继续游戏循环
-    this.gameLoopId = setTimeout(() => this.gameLoop(), 1000 / 30);
-  },
-
-  updateStars() {
+    // 绘制星星背景
     this.stars.forEach(star => {
       star.update();
       star.draw(this.ctx);
     });
-  },
 
-  updateEnemies() {
-    for (let i = this.enemies.length - 1; i >= 0; i--) {
-      const enemy = this.enemies[i];
+    // 更新和绘制玩家
+    if (this.player) {
+      this.player.update(this.moveState, this.canvasWidth, this.canvasHeight);
+      this.player.draw(this.ctx);
+    }
+
+    // 生成敌人
+    this.spawnEnemies();
+
+    // 更新和绘制敌人
+    this.enemies.forEach((enemy, index) => {
       enemy.update();
       enemy.draw(this.ctx);
 
       if (enemy.isOffScreen(this.canvasHeight)) {
-        this.enemies.splice(i, 1);
+        this.enemies.splice(index, 1);
       }
-    }
-  },
+    });
 
-  updateBullets() {
-    for (let i = this.bullets.length - 1; i >= 0; i--) {
-      const bullet = this.bullets[i];
+    // 更新和绘制子弹
+    this.bullets.forEach((bullet, index) => {
       bullet.update();
       bullet.draw(this.ctx);
 
       if (bullet.isOffScreen(this.canvasHeight)) {
-        this.bullets.splice(i, 1);
+        this.bullets.splice(index, 1);
       }
-    }
-  },
+    });
 
-  updateExplosions() {
-    for (let i = this.explosions.length - 1; i >= 0; i--) {
-      const explosion = this.explosions[i];
+    // 更新和绘制爆炸效果
+    this.explosions.forEach((explosion, index) => {
       explosion.update();
       explosion.draw(this.ctx);
 
       if (explosion.isDead()) {
-        this.explosions.splice(i, 1);
+        this.explosions.splice(index, 1);
       }
+    });
+
+    // 检查碰撞
+    this.checkCollisions();
+
+    // 更新等级
+    if (this.gameState.score > this.gameState.level * 500) {
+      this.gameState.level++;
+      this.setData({ level: this.gameState.level });
     }
+
+    // 更新UI
+    this.setData({
+      score: this.gameState.score,
+      lives: this.gameState.lives
+    });
+
+    this.canvas.requestAnimationFrame(() => this.gameLoop());
   },
 
   spawnEnemies() {
-    if (Math.random() < 0.015 + this.gameState.level * 0.003) { // 降低生成频率
+    if (Math.random() < 0.02 + this.gameState.level * 0.005) {
       let enemyType = 'basic';
       let rand = Math.random();
       
@@ -232,39 +212,50 @@ Page({
 
   checkCollisions() {
     // 玩家子弹与敌人碰撞
-    for (let i = this.bullets.length - 1; i >= 0; i--) {
-      const bullet = this.bullets[i];
+    this.bullets.forEach((bullet, bulletIndex) => {
       if (bullet.isPlayerBullet) {
-        for (let j = this.enemies.length - 1; j >= 0; j--) {
-          const enemy = this.enemies[j];
+        this.enemies.forEach((enemy, enemyIndex) => {
           if (this.isColliding(bullet, enemy)) {
-            this.bullets.splice(i, 1);
+            this.bullets.splice(bulletIndex, 1);
             enemy.health--;
             
             if (enemy.health <= 0) {
               this.explosions.push(new Explosion(enemy.x + enemy.width/2, enemy.y + enemy.height/2));
               this.gameState.score += enemy.points;
-              this.enemies.splice(j, 1);
+              this.enemies.splice(enemyIndex, 1);
             }
-            break;
+          }
+        });
+      }
+    });
+
+    // 敌人子弹与玩家碰撞
+    this.bullets.forEach((bullet, bulletIndex) => {
+      if (!bullet.isPlayerBullet && this.player) {
+        if (this.isColliding(bullet, this.player)) {
+          this.bullets.splice(bulletIndex, 1);
+          this.gameState.lives--;
+          this.explosions.push(new Explosion(this.player.x + this.player.width/2, this.player.y + this.player.height/2));
+          
+          if (this.gameState.lives <= 0) {
+            this.gameOver();
           }
         }
       }
-    }
+    });
 
     // 敌人与玩家碰撞
-    for (let i = this.enemies.length - 1; i >= 0; i--) {
-      const enemy = this.enemies[i];
+    this.enemies.forEach((enemy, enemyIndex) => {
       if (this.player && this.isColliding(enemy, this.player)) {
         this.explosions.push(new Explosion(enemy.x + enemy.width/2, enemy.y + enemy.height/2));
-        this.enemies.splice(i, 1);
+        this.enemies.splice(enemyIndex, 1);
         this.gameState.lives--;
         
         if (this.gameState.lives <= 0) {
           this.gameOver();
         }
       }
-    }
+    });
   },
 
   isColliding(obj1, obj2) {
@@ -276,12 +267,6 @@ Page({
 
   gameOver() {
     this.gameState.gameRunning = false;
-    
-    // 清理游戏循环
-    if (this.gameLoopId) {
-      clearTimeout(this.gameLoopId);
-      this.gameLoopId = null;
-    }
     
     // 更新最高分
     if (this.gameState.score > this.data.highScore) {
@@ -350,12 +335,6 @@ Page({
   },
 
   restartGame() {
-    // 清理旧的游戏循环
-    if (this.gameLoopId) {
-      clearTimeout(this.gameLoopId);
-      this.gameLoopId = null;
-    }
-    
     this.initGame();
     this.startGame();
   },
@@ -368,14 +347,10 @@ Page({
 
   cleanup() {
     this.gameState.gameRunning = false;
-    if (this.gameLoopId) {
-      clearTimeout(this.gameLoopId);
-      this.gameLoopId = null;
-    }
   }
 });
 
-// 简化的游戏类定义
+// 游戏类定义
 class Player {
   constructor(x, y) {
     this.x = x;
@@ -401,12 +376,14 @@ class Player {
   }
 
   draw(ctx) {
-    // 简化绘制以提高性能
     ctx.fillStyle = '#00ffff';
     ctx.fillRect(this.x, this.y, this.width, this.height);
     
     ctx.fillStyle = '#ffffff';
-    ctx.fillRect(this.x + 8, this.y + 8, this.width - 16, this.height - 16);
+    ctx.fillRect(this.x + 5, this.y + 5, this.width - 10, this.height - 10);
+    
+    ctx.fillStyle = '#ff0000';
+    ctx.fillRect(this.x + 15, this.y + 15, 10, 10);
   }
 }
 
@@ -440,6 +417,8 @@ class Enemy {
     this.x = x;
     this.y = y;
     this.type = type;
+    this.lastShot = 0;
+    this.shootCooldown = 1000 + Math.random() * 2000;
     
     if (type === 'basic') {
       this.width = 30;
@@ -487,16 +466,15 @@ class Explosion {
     this.x = x;
     this.y = y;
     this.particles = [];
-    this.life = 20; // 减少生命周期以提高性能
+    this.life = 30;
     
-    // 减少粒子数量
-    for (let i = 0; i < 5; i++) {
+    for (let i = 0; i < 8; i++) {
       this.particles.push({
         x: x,
         y: y,
-        vx: (Math.random() - 0.5) * 6,
-        vy: (Math.random() - 0.5) * 6,
-        life: 20,
+        vx: (Math.random() - 0.5) * 8,
+        vy: (Math.random() - 0.5) * 8,
+        life: 30,
         color: `hsl(${Math.random() * 60 + 10}, 100%, 50%)`
       });
     }
@@ -508,8 +486,8 @@ class Explosion {
       particle.x += particle.vx;
       particle.y += particle.vy;
       particle.life--;
-      particle.vx *= 0.95;
-      particle.vy *= 0.95;
+      particle.vx *= 0.98;
+      particle.vy *= 0.98;
     });
     
     this.particles = this.particles.filter(particle => particle.life > 0);
@@ -518,8 +496,8 @@ class Explosion {
   draw(ctx) {
     this.particles.forEach(particle => {
       ctx.fillStyle = particle.color;
-      ctx.globalAlpha = particle.life / 20;
-      ctx.fillRect(particle.x, particle.y, 2, 2);
+      ctx.globalAlpha = particle.life / 30;
+      ctx.fillRect(particle.x, particle.y, 3, 3);
     });
     ctx.globalAlpha = 1;
   }
@@ -533,9 +511,9 @@ class Star {
   constructor(canvasWidth, canvasHeight) {
     this.x = Math.random() * canvasWidth;
     this.y = Math.random() * canvasHeight;
-    this.speed = Math.random() * 1 + 0.5;
-    this.size = Math.random() * 1.5 + 0.5;
-    this.opacity = Math.random() * 0.6 + 0.2;
+    this.speed = Math.random() * 2 + 0.5;
+    this.size = Math.random() * 2 + 1;
+    this.opacity = Math.random() * 0.8 + 0.2;
     this.canvasWidth = canvasWidth;
     this.canvasHeight = canvasHeight;
   }
