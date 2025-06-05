@@ -2,7 +2,37 @@
 
 ## 🔧 常见错误及解决方案
 
-### 1. ReferenceError: Trace is not defined
+### 1. Error: /game.json not found (错误码：800059)
+
+**错误描述**:
+```
+Error: 系统错误，错误码：800059,error: /game.json not found
+```
+
+**原因**: 微信小程序每个页面都需要对应的 `.json` 配置文件
+
+**解决方案**:
+1. 确保每个页面目录下都有对应的 `.json` 文件
+2. 检查文件结构：
+   ```
+   pages/game/
+   ├── game.js
+   ├── game.json    ← 必需的配置文件
+   ├── game.wxml
+   └── game.wxss
+   ```
+
+3. `game.json` 内容示例：
+   ```json
+   {
+     "navigationBarTitleText": "太空射击游戏",
+     "navigationBarBackgroundColor": "#000428",
+     "navigationBarTextStyle": "white",
+     "disableScroll": true
+   }
+   ```
+
+### 2. ReferenceError: Trace is not defined
 
 **错误描述**:
 ```

@@ -1,0 +1,11 @@
+{
+  "navigationBarTitleText": "太空射击游戏",
+  "navigationBarBackgroundColor": "#000428",
+  "navigationBarTextStyle": "white",
+  "backgroundColor": "#000428",
+  "backgroundTextStyle": "light",
+  "enablePullDownRefresh": false,
+  "onReachBottomDistance": 50,
+  "disableScroll": true,
+  "usingComponents": {}
+}
