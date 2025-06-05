@@ -1,0 +1,15 @@
+{
+  "pages": [
+    "pages/game/game"
+  ],
+  "window": {
+    "backgroundTextStyle": "light",
+    "navigationBarBackgroundColor": "#000428",
+    "navigationBarTitleText": "太空射击游戏",
+    "navigationBarTextStyle": "white",
+    "backgroundColor": "#000428"
+  },
+  "style": "v2",
+  "sitemapLocation": "sitemap.json",
+  "lazyCodeLoading": "requiredComponents"
+}

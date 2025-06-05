@@ -1,0 +1,54 @@
+<!--pages/game/game.wxml-->
+<view class="game-container">
+  <!-- 游戏画布 -->
+  <canvas 
+    type="2d" 
+    id="gameCanvas" 
+    class="game-canvas"
+    bindtouchstart="onTouchStart"
+    bindtouchmove="onTouchMove"
+    bindtouchend="onTouchEnd"
+  ></canvas>
+  
+  <!-- 游戏UI -->
+  <view class="game-ui">
+    <view class="score-info">
+      <text class="ui-text">分数: {{score}}</text>
+      <text class="ui-text">生命: {{lives}}</text>
+      <text class="ui-text">等级: {{level}}</text>
+    </view>
+    <view class="high-score">
+      <text class="ui-text">最高分: {{highScore}}</text>
+    </view>
+  </view>
+  
+  <!-- 游戏结束界面 -->
+  <view class="game-over" wx:if="{{gameOver}}">
+    <view class="game-over-content">
+      <text class="game-over-title">游戏结束!</text>
+      <text class="final-score">最终分数: {{score}}</text>
+      <button class="restart-btn" bindtap="restartGame">重新开始</button>
+      <button class="share-btn" bindtap="shareGame">分享游戏</button>
+    </view>
+  </view>
+  
+  <!-- 控制按钮 -->
+  <view class="controls" wx:if="{{!gameOver}}">
+    <view class="control-row">
+      <button class="control-btn" bindtouchstart="onMoveStart" bindtouchend="onMoveEnd" data-direction="up">↑</button>
+    </view>
+    <view class="control-row">
+      <button class="control-btn" bindtouchstart="onMoveStart" bindtouchend="onMoveEnd" data-direction="left">←</button>
+      <button class="shoot-btn" bindtap="onShoot">射击</button>
+      <button class="control-btn" bindtouchstart="onMoveStart" bindtouchend="onMoveEnd" data-direction="right">→</button>
+    </view>
+    <view class="control-row">
+      <button class="control-btn" bindtouchstart="onMoveStart" bindtouchend="onMoveEnd" data-direction="down">↓</button>
+    </view>
+  </view>
+  
+  <!-- 暂停按钮 -->
+  <view class="pause-btn" bindtap="togglePause" wx:if="{{!gameOver}}">
+    <text>{{paused ? '继续' : '暂停'}}</text>
+  </view>
+</view>

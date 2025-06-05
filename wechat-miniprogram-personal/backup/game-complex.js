@@ -1,0 +1,555 @@
+// pages/game/game.js - 太空射击游戏，专门针对微信小程序优化
+Page({
+  data: {
+    score: 0,
+    lives: 3,
+    level: 1,
+    highScore: 0,
+    gameOver: false,
+    paused: false
+  },
+
+  onLoad() {
+    // 获取历史最高分
+    const highScore = wx.getStorageSync('highScore') || 0;
+    this.setData({ highScore });
+    
+    // 初始化游戏
+    this.initGame();
+  },
+
+  onReady() {
+    // 页面渲染完成后初始化Canvas
+    this.initCanvas();
+  },
+
+  onUnload() {
+    // 页面卸载时清理资源
+    this.cleanup();
+  },
+
+  initCanvas() {
+    const query = wx.createSelectorQuery();
+    query.select('#gameCanvas')
+      .fields({ node: true, size: true })
+      .exec((res) => {
+        try {
+          const canvas = res[0].node;
+          const ctx = canvas.getContext('2d');
+          
+          // 设置画布尺寸
+          const systemInfo = wx.getSystemInfoSync();
+          const dpr = systemInfo.pixelRatio || 2;
+          
+          canvas.width = res[0].width * dpr;
+          canvas.height = res[0].height * dpr;
+          ctx.scale(dpr, dpr);
+          
+          this.canvas = canvas;
+          this.ctx = ctx;
+          this.canvasWidth = res[0].width;
+          this.canvasHeight = res[0].height;
+          
+          // 开始游戏
+          this.startGame();
+        } catch (error) {
+          console.error('Canvas initialization failed:', error);
+          wx.showToast({
+            title: '游戏初始化失败，请重试',
+            icon: 'none'
+          });
+        }
+      });
+  },
+
+  initGame() {
+    // 游戏状态初始化
+    this.gameState = {
+      score: 0,
+      lives: 3,
+      level: 1,
+      gameRunning: true,
+      paused: false,
+      lastShot: 0,
+      shootCooldown: 200
+    };
+
+    // 游戏对象数组
+    this.player = null;
+    this.bullets = [];
+    this.enemies = [];
+    this.explosions = [];
+    this.stars = [];
+    
+    // 移动状态
+    this.moveState = {
+      up: false,
+      down: false,
+      left: false,
+      right: false
+    };
+
+    // 游戏循环ID
+    this.gameLoopId = null;
+
+    this.setData({
+      score: 0,
+      lives: 3,
+      level: 1,
+      gameOver: false,
+      paused: false
+    });
+  },
+
+  startGame() {
+    if (!this.ctx) return;
+    
+    // 创建玩家
+    this.player = new Player(this.canvasWidth / 2, this.canvasHeight - 80);
+    
+    // 创建星星背景
+    this.stars = [];
+    for (let i = 0; i < 30; i++) { // 减少星星数量以提高性能
+      this.stars.push(new Star(this.canvasWidth, this.canvasHeight));
+    }
+    
+    // 开始游戏循环
+    this.gameLoop();
+  },
+
+  gameLoop() {
+    if (!this.gameState.gameRunning || this.data.paused) {
+      if (this.gameState.gameRunning) {
+        // 使用 setTimeout 替代 requestAnimationFrame
+        this.gameLoopId = setTimeout(() => this.gameLoop(), 1000 / 30); // 30 FPS 以提高兼容性
+      }
+      return;
+    }
+
+    try {
+      // 清空画布
+      this.ctx.clearRect(0, 0, this.canvasWidth, this.canvasHeight);
+
+      // 绘制星星背景
+      this.updateStars();
+
+      // 更新和绘制玩家
+      if (this.player) {
+        this.player.update(this.moveState, this.canvasWidth, this.canvasHeight);
+        this.player.draw(this.ctx);
+      }
+
+      // 生成敌人
+      this.spawnEnemies();
+
+      // 更新游戏对象
+      this.updateEnemies();
+      this.updateBullets();
+      this.updateExplosions();
+
+      // 检查碰撞
+      this.checkCollisions();
+
+      // 更新等级
+      if (this.gameState.score > this.gameState.level * 500) {
+        this.gameState.level++;
+        this.setData({ level: this.gameState.level });
+      }
+
+      // 更新UI（减少频率以提高性能）
+      if (Date.now() % 5 === 0) {
+        this.setData({
+          score: this.gameState.score,
+          lives: this.gameState.lives
+        });
+      }
+
+    } catch (error) {
+      console.error('Game loop error:', error);
+    }
+
+    // 继续游戏循环
+    this.gameLoopId = setTimeout(() => this.gameLoop(), 1000 / 30);
+  },
+
+  updateStars() {
+    this.stars.forEach(star => {
+      star.update();
+      star.draw(this.ctx);
+    });
+  },
+
+  updateEnemies() {
+    for (let i = this.enemies.length - 1; i >= 0; i--) {
+      const enemy = this.enemies[i];
+      enemy.update();
+      enemy.draw(this.ctx);
+
+      if (enemy.isOffScreen(this.canvasHeight)) {
+        this.enemies.splice(i, 1);
+      }
+    }
+  },
+
+  updateBullets() {
+    for (let i = this.bullets.length - 1; i >= 0; i--) {
+      const bullet = this.bullets[i];
+      bullet.update();
+      bullet.draw(this.ctx);
+
+      if (bullet.isOffScreen(this.canvasHeight)) {
+        this.bullets.splice(i, 1);
+      }
+    }
+  },
+
+  updateExplosions() {
+    for (let i = this.explosions.length - 1; i >= 0; i--) {
+      const explosion = this.explosions[i];
+      explosion.update();
+      explosion.draw(this.ctx);
+
+      if (explosion.isDead()) {
+        this.explosions.splice(i, 1);
+      }
+    }
+  },
+
+  spawnEnemies() {
+    if (Math.random() < 0.015 + this.gameState.level * 0.003) { // 降低生成频率
+      let enemyType = 'basic';
+      let rand = Math.random();
+      
+      if (rand < 0.1) {
+        enemyType = 'tank';
+      } else if (rand < 0.3) {
+        enemyType = 'fast';
+      }
+      
+      this.enemies.push(new Enemy(Math.random() * (this.canvasWidth - 40), -40, enemyType));
+    }
+  },
+
+  checkCollisions() {
+    // 玩家子弹与敌人碰撞
+    for (let i = this.bullets.length - 1; i >= 0; i--) {
+      const bullet = this.bullets[i];
+      if (bullet.isPlayerBullet) {
+        for (let j = this.enemies.length - 1; j >= 0; j--) {
+          const enemy = this.enemies[j];
+          if (this.isColliding(bullet, enemy)) {
+            this.bullets.splice(i, 1);
+            enemy.health--;
+            
+            if (enemy.health <= 0) {
+              this.explosions.push(new Explosion(enemy.x + enemy.width/2, enemy.y + enemy.height/2));
+              this.gameState.score += enemy.points;
+              this.enemies.splice(j, 1);
+            }
+            break;
+          }
+        }
+      }
+    }
+
+    // 敌人与玩家碰撞
+    for (let i = this.enemies.length - 1; i >= 0; i--) {
+      const enemy = this.enemies[i];
+      if (this.player && this.isColliding(enemy, this.player)) {
+        this.explosions.push(new Explosion(enemy.x + enemy.width/2, enemy.y + enemy.height/2));
+        this.enemies.splice(i, 1);
+        this.gameState.lives--;
+        
+        if (this.gameState.lives <= 0) {
+          this.gameOver();
+        }
+      }
+    }
+  },
+
+  isColliding(obj1, obj2) {
+    return obj1.x < obj2.x + obj2.width &&
+           obj1.x + obj1.width > obj2.x &&
+           obj1.y < obj2.y + obj2.height &&
+           obj1.y + obj1.height > obj2.y;
+  },
+
+  gameOver() {
+    this.gameState.gameRunning = false;
+    
+    // 清理游戏循环
+    if (this.gameLoopId) {
+      clearTimeout(this.gameLoopId);
+      this.gameLoopId = null;
+    }
+    
+    // 更新最高分
+    if (this.gameState.score > this.data.highScore) {
+      wx.setStorageSync('highScore', this.gameState.score);
+      this.setData({ highScore: this.gameState.score });
+    }
+    
+    this.setData({ gameOver: true });
+  },
+
+  // 触控事件处理
+  onMoveStart(e) {
+    const direction = e.currentTarget.dataset.direction;
+    this.moveState[direction] = true;
+  },
+
+  onMoveEnd(e) {
+    const direction = e.currentTarget.dataset.direction;
+    this.moveState[direction] = false;
+  },
+
+  onShoot() {
+    if (this.player && Date.now() - this.gameState.lastShot > this.gameState.shootCooldown) {
+      this.bullets.push(new Bullet(
+        this.player.x + this.player.width/2 - 2, 
+        this.player.y, 
+        -8, 
+        '#00ffff', 
+        true
+      ));
+      this.gameState.lastShot = Date.now();
+    }
+  },
+
+  // 触摸屏幕移动
+  onTouchStart(e) {
+    this.touchStartX = e.touches[0].x;
+    this.touchStartY = e.touches[0].y;
+  },
+
+  onTouchMove(e) {
+    if (!this.player) return;
+    
+    const deltaX = e.touches[0].x - this.touchStartX;
+    const deltaY = e.touches[0].y - this.touchStartY;
+    
+    this.player.x = Math.max(0, Math.min(this.canvasWidth - this.player.width, this.player.x + deltaX * 0.5));
+    this.player.y = Math.max(0, Math.min(this.canvasHeight - this.player.height, this.player.y + deltaY * 0.5));
+    
+    this.touchStartX = e.touches[0].x;
+    this.touchStartY = e.touches[0].y;
+  },
+
+  onTouchEnd() {
+    // 触摸结束时自动射击
+    this.onShoot();
+  },
+
+  togglePause() {
+    const paused = !this.data.paused;
+    this.setData({ paused });
+    
+    if (!paused && this.gameState.gameRunning) {
+      this.gameLoop();
+    }
+  },
+
+  restartGame() {
+    // 清理旧的游戏循环
+    if (this.gameLoopId) {
+      clearTimeout(this.gameLoopId);
+      this.gameLoopId = null;
+    }
+    
+    this.initGame();
+    this.startGame();
+  },
+
+  shareGame() {
+    wx.showShareMenu({
+      withShareTicket: true
+    });
+  },
+
+  cleanup() {
+    this.gameState.gameRunning = false;
+    if (this.gameLoopId) {
+      clearTimeout(this.gameLoopId);
+      this.gameLoopId = null;
+    }
+  }
+});
+
+// 简化的游戏类定义
+class Player {
+  constructor(x, y) {
+    this.x = x;
+    this.y = y;
+    this.width = 40;
+    this.height = 40;
+    this.speed = 3;
+  }
+
+  update(moveState, canvasWidth, canvasHeight) {
+    if (moveState.left) {
+      this.x = Math.max(0, this.x - this.speed);
+    }
+    if (moveState.right) {
+      this.x = Math.min(canvasWidth - this.width, this.x + this.speed);
+    }
+    if (moveState.up) {
+      this.y = Math.max(0, this.y - this.speed);
+    }
+    if (moveState.down) {
+      this.y = Math.min(canvasHeight - this.height, this.y + this.speed);
+    }
+  }
+
+  draw(ctx) {
+    // 简化绘制以提高性能
+    ctx.fillStyle = '#00ffff';
+    ctx.fillRect(this.x, this.y, this.width, this.height);
+    
+    ctx.fillStyle = '#ffffff';
+    ctx.fillRect(this.x + 8, this.y + 8, this.width - 16, this.height - 16);
+  }
+}
+
+class Bullet {
+  constructor(x, y, speed, color, isPlayerBullet = false) {
+    this.x = x;
+    this.y = y;
+    this.width = 4;
+    this.height = 10;
+    this.speed = speed;
+    this.color = color;
+    this.isPlayerBullet = isPlayerBullet;
+  }
+
+  update() {
+    this.y += this.speed;
+  }
+
+  draw(ctx) {
+    ctx.fillStyle = this.color;
+    ctx.fillRect(this.x, this.y, this.width, this.height);
+  }
+
+  isOffScreen(canvasHeight) {
+    return this.y < -this.height || this.y > canvasHeight;
+  }
+}
+
+class Enemy {
+  constructor(x, y, type = 'basic') {
+    this.x = x;
+    this.y = y;
+    this.type = type;
+    
+    if (type === 'basic') {
+      this.width = 30;
+      this.height = 30;
+      this.speed = 1 + Math.random() * 2;
+      this.health = 1;
+      this.color = '#ff0000';
+      this.points = 10;
+    } else if (type === 'fast') {
+      this.width = 25;
+      this.height = 25;
+      this.speed = 3 + Math.random() * 2;
+      this.health = 1;
+      this.color = '#ff6600';
+      this.points = 20;
+    } else if (type === 'tank') {
+      this.width = 40;
+      this.height = 40;
+      this.speed = 0.5 + Math.random();
+      this.health = 3;
+      this.color = '#800080';
+      this.points = 50;
+    }
+  }
+
+  update() {
+    this.y += this.speed;
+  }
+
+  draw(ctx) {
+    ctx.fillStyle = this.color;
+    ctx.fillRect(this.x, this.y, this.width, this.height);
+    
+    ctx.fillStyle = '#ffffff';
+    ctx.fillRect(this.x + 5, this.y + 5, this.width - 10, this.height - 10);
+  }
+
+  isOffScreen(canvasHeight) {
+    return this.y > canvasHeight;
+  }
+}
+
+class Explosion {
+  constructor(x, y) {
+    this.x = x;
+    this.y = y;
+    this.particles = [];
+    this.life = 20; // 减少生命周期以提高性能
+    
+    // 减少粒子数量
+    for (let i = 0; i < 5; i++) {
+      this.particles.push({
+        x: x,
+        y: y,
+        vx: (Math.random() - 0.5) * 6,
+        vy: (Math.random() - 0.5) * 6,
+        life: 20,
+        color: `hsl(${Math.random() * 60 + 10}, 100%, 50%)`
+      });
+    }
+  }
+
+  update() {
+    this.life--;
+    this.particles.forEach(particle => {
+      particle.x += particle.vx;
+      particle.y += particle.vy;
+      particle.life--;
+      particle.vx *= 0.95;
+      particle.vy *= 0.95;
+    });
+    
+    this.particles = this.particles.filter(particle => particle.life > 0);
+  }
+
+  draw(ctx) {
+    this.particles.forEach(particle => {
+      ctx.fillStyle = particle.color;
+      ctx.globalAlpha = particle.life / 20;
+      ctx.fillRect(particle.x, particle.y, 2, 2);
+    });
+    ctx.globalAlpha = 1;
+  }
+
+  isDead() {
+    return this.life <= 0 && this.particles.length === 0;
+  }
+}
+
+class Star {
+  constructor(canvasWidth, canvasHeight) {
+    this.x = Math.random() * canvasWidth;
+    this.y = Math.random() * canvasHeight;
+    this.speed = Math.random() * 1 + 0.5;
+    this.size = Math.random() * 1.5 + 0.5;
+    this.opacity = Math.random() * 0.6 + 0.2;
+    this.canvasWidth = canvasWidth;
+    this.canvasHeight = canvasHeight;
+  }
+
+  update() {
+    this.y += this.speed;
+    if (this.y > this.canvasHeight) {
+      this.y = -this.size;
+      this.x = Math.random() * this.canvasWidth;
+    }
+  }
+
+  draw(ctx) {
+    ctx.fillStyle = `rgba(255, 255, 255, ${this.opacity})`;
+    ctx.fillRect(this.x, this.y, this.size, this.size);
+  }
+}

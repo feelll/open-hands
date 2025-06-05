@@ -1,0 +1,28 @@
+/* pages/game/game.wxss - 测试版本 */
+.container {
+  width: 100vw;
+  height: 100vh;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  background: linear-gradient(to bottom, #000428, #004e92);
+}
+
+.message {
+  color: white;
+  font-size: 32rpx;
+  margin-bottom: 40rpx;
+  text-align: center;
+  padding: 20rpx;
+}
+
+button {
+  background: #00ffff;
+  color: #000;
+  border: none;
+  border-radius: 10rpx;
+  padding: 20rpx 40rpx;
+  font-size: 28rpx;
+  font-weight: bold;
+}
