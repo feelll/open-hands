@@ -9,13 +9,16 @@ if ! command -v python3 &> /dev/null; then
     exit 1
 fi
 
-# 切换到游戏目录
-cd "$(dirname "$0")"
+# 切换到web版本目录
+cd "$(dirname "$0")/../web-version"
 
 echo "📁 当前目录: $(pwd)"
 echo "🌐 启动HTTP服务器在端口 12000..."
+echo "📱 游戏地址: http://localhost:12000"
+echo "🎮 按 Ctrl+C 停止服务器"
+echo ""
 
 # 启动服务器
-python3 server.py
+python3 ../scripts/server.py
 
 echo "🎮 游戏服务器已停止"
