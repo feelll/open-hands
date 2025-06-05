@@ -1,0 +1,351 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>分析报告 - {{ report.basic_info.title }}</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <style>
+        .report-header {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 40px 0;
+        }
+        .metric-card {
+            border: none;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+            transition: transform 0.2s ease;
+        }
+        .metric-card:hover {
+            transform: translateY(-2px);
+        }
+        .metric-value {
+            font-size: 2rem;
+            font-weight: bold;
+        }
+        .chart-container {
+            background: white;
+            border-radius: 10px;
+            padding: 20px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+            margin-bottom: 20px;
+        }
+        .summary-item {
+            background: #f8f9fa;
+            border-left: 4px solid #007bff;
+            padding: 15px;
+            margin-bottom: 10px;
+            border-radius: 0 5px 5px 0;
+        }
+        .category-badge {
+            font-size: 0.9rem;
+            padding: 8px 12px;
+        }
+    </style>
+</head>
+<body>
+    <!-- Header -->
+    <div class="report-header">
+        <div class="container">
+            <div class="row">
+                <div class="col-12">
+                    <div class="d-flex justify-content-between align-items-center">
+                        <div>
+                            <h1 class="mb-2">
+                                <i class="fas fa-chart-line me-3"></i>
+                                分析报告
+                            </h1>
+                            <p class="mb-0">{{ report.basic_info.title or '无标题' }}</p>
+                            <small class="opacity-75">{{ report.url }}</small>
+                        </div>
+                        <div>
+                            <a href="/" class="btn btn-light">
+                                <i class="fas fa-arrow-left me-2"></i>
+                                返回首页
+                            </a>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="container my-5">
+        <!-- 基本信息 -->
+        <div class="row mb-4">
+            <div class="col-12">
+                <h3 class="mb-3">基本信息</h3>
+            </div>
+            <div class="col-md-3">
+                <div class="card metric-card">
+                    <div class="card-body text-center">
+                        <i class="fas fa-file-alt fa-2x text-primary mb-2"></i>
+                        <div class="metric-value text-primary">{{ report.basic_info.total_paragraphs }}</div>
+                        <small class="text-muted">段落数量</small>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-3">
+                <div class="card metric-card">
+                    <div class="card-body text-center">
+                        <i class="fas fa-link fa-2x text-success mb-2"></i>
+                        <div class="metric-value text-success">{{ report.basic_info.total_links }}</div>
+                        <small class="text-muted">链接数量</small>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-3">
+                <div class="card metric-card">
+                    <div class="card-body text-center">
+                        <i class="fas fa-image fa-2x text-warning mb-2"></i>
+                        <div class="metric-value text-warning">{{ report.basic_info.total_images }}</div>
+                        <small class="text-muted">图片数量</small>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-3">
+                <div class="card metric-card">
+                    <div class="card-body text-center">
+                        <i class="fas fa-font fa-2x text-info mb-2"></i>
+                        <div class="metric-value text-info">{{ "%.1f"|format(report.basic_info.total_text_length / 1000) }}K</div>
+                        <small class="text-muted">文本长度</small>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- 分析摘要 -->
+        {% if report.summary %}
+        <div class="row mb-4">
+            <div class="col-12">
+                <h3 class="mb-3">分析摘要</h3>
+                {% for item in report.summary %}
+                <div class="summary-item">
+                    <i class="fas fa-check-circle text-success me-2"></i>
+                    {{ item }}
+                </div>
+                {% endfor %}
+            </div>
+        </div>
+        {% endif %}
+
+        <!-- 内容分类 -->
+        {% if report.analysis_results.categories %}
+        <div class="row mb-4">
+            <div class="col-12">
+                <h3 class="mb-3">内容分类</h3>
+                <div class="d-flex flex-wrap gap-2">
+                    {% for category in report.analysis_results.categories %}
+                    <span class="badge category-badge" 
+                          style="background-color: rgba({{ (category.confidence * 255)|int }}, {{ (100 + category.confidence * 155)|int }}, {{ (50 + category.confidence * 205)|int }}, 0.8);">
+                        {{ category.category.title() }}
+                        <small>({{ "%.0f"|format(category.confidence * 100) }}%)</small>
+                    </span>
+                    {% endfor %}
+                </div>
+            </div>
+        </div>
+        {% endif %}
+
+        <!-- 词云图 -->
+        {% if report.wordcloud_path %}
+        <div class="row mb-4">
+            <div class="col-12">
+                <div class="chart-container">
+                    <h4 class="mb-3">词云分析</h4>
+                    <div class="text-center">
+                        <img src="{{ report.wordcloud_path }}" alt="词云图" class="img-fluid" style="max-height: 400px;">
+                    </div>
+                </div>
+            </div>
+        </div>
+        {% endif %}
+
+        <!-- 可视化图表 -->
+        {% if report.visualizations %}
+        <div class="row">
+            {% if report.visualizations.search_terms_chart %}
+            <div class="col-12 mb-4">
+                <div class="chart-container">
+                    <h4 class="mb-3">搜索词频率分析</h4>
+                    {{ report.visualizations.search_terms_chart|safe }}
+                </div>
+            </div>
+            {% endif %}
+
+            {% if report.visualizations.heading_distribution %}
+            <div class="col-md-6 mb-4">
+                <div class="chart-container">
+                    <h4 class="mb-3">标题分布</h4>
+                    {{ report.visualizations.heading_distribution|safe }}
+                </div>
+            </div>
+            {% endif %}
+
+            {% if report.visualizations.density_metrics %}
+            <div class="col-md-6 mb-4">
+                <div class="chart-container">
+                    <h4 class="mb-3">内容密度指标</h4>
+                    {{ report.visualizations.density_metrics|safe }}
+                </div>
+            </div>
+            {% endif %}
+
+            {% if report.visualizations.categories_chart %}
+            <div class="col-12 mb-4">
+                <div class="chart-container">
+                    <h4 class="mb-3">分类置信度</h4>
+                    {{ report.visualizations.categories_chart|safe }}
+                </div>
+            </div>
+            {% endif %}
+        </div>
+        {% endif %}
+
+        <!-- 详细数据 -->
+        <div class="row">
+            <!-- 搜索词分析 -->
+            {% if report.analysis_results.search_terms %}
+            <div class="col-md-6 mb-4">
+                <div class="chart-container">
+                    <h4 class="mb-3">搜索词统计</h4>
+                    <div class="row">
+                        <div class="col-6">
+                            <div class="text-center">
+                                <div class="h4 text-primary">{{ report.analysis_results.search_terms.total_unique_terms }}</div>
+                                <small class="text-muted">独特词汇</small>
+                            </div>
+                        </div>
+                        <div class="col-6">
+                            <div class="text-center">
+                                <div class="h4 text-success">{{ report.analysis_results.search_terms.frequency_distribution.high_frequency }}</div>
+                                <small class="text-muted">高频词汇</small>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    {% if report.analysis_results.search_terms.top_terms %}
+                    <h6 class="mt-3">热门搜索词</h6>
+                    <div class="table-responsive">
+                        <table class="table table-sm">
+                            <thead>
+                                <tr>
+                                    <th>词汇</th>
+                                    <th>频率</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for term in report.analysis_results.search_terms.top_terms[:10] %}
+                                <tr>
+                                    <td>{{ term.term }}</td>
+                                    <td>{{ term.frequency }}</td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                    {% endif %}
+                </div>
+            </div>
+            {% endif %}
+
+            <!-- 情感分析 -->
+            {% if report.analysis_results.sentiment %}
+            <div class="col-md-6 mb-4">
+                <div class="chart-container">
+                    <h4 class="mb-3">情感分析</h4>
+                    {% set sentiment = report.analysis_results.sentiment %}
+                    <div class="text-center mb-3">
+                        {% if sentiment.sentiment_label == 'positive' %}
+                        <i class="fas fa-smile fa-3x text-success"></i>
+                        <div class="h5 text-success mt-2">积极</div>
+                        {% elif sentiment.sentiment_label == 'negative' %}
+                        <i class="fas fa-frown fa-3x text-danger"></i>
+                        <div class="h5 text-danger mt-2">消极</div>
+                        {% else %}
+                        <i class="fas fa-meh fa-3x text-warning"></i>
+                        <div class="h5 text-warning mt-2">中性</div>
+                        {% endif %}
+                    </div>
+                    <div class="row">
+                        <div class="col-6">
+                            <div class="text-center">
+                                <div class="h6 text-success">{{ sentiment.positive_words_count }}</div>
+                                <small class="text-muted">积极词汇</small>
+                            </div>
+                        </div>
+                        <div class="col-6">
+                            <div class="text-center">
+                                <div class="h6 text-danger">{{ sentiment.negative_words_count }}</div>
+                                <small class="text-muted">消极词汇</small>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            {% endif %}
+
+            <!-- 用户偏好 -->
+            {% if report.analysis_results.preferences %}
+            <div class="col-12 mb-4">
+                <div class="chart-container">
+                    <h4 class="mb-3">用户偏好分析</h4>
+                    {% set prefs = report.analysis_results.preferences %}
+                    
+                    {% if prefs.content_types %}
+                    <h6>内容类型偏好</h6>
+                    <div class="d-flex flex-wrap gap-2 mb-3">
+                        {% for content_type in prefs.content_types %}
+                        <span class="badge bg-primary">{{ content_type.replace('_', ' ').title() }}</span>
+                        {% endfor %}
+                    </div>
+                    {% endif %}
+                    
+                    <h6>媒体偏好分布</h6>
+                    <div class="row">
+                        <div class="col-md-4">
+                            <div class="text-center">
+                                <div class="h5 text-info">{{ prefs.media_preference.text }}</div>
+                                <small class="text-muted">文本内容</small>
+                            </div>
+                        </div>
+                        <div class="col-md-4">
+                            <div class="text-center">
+                                <div class="h5 text-warning">{{ prefs.media_preference.images }}</div>
+                                <small class="text-muted">图片内容</small>
+                            </div>
+                        </div>
+                        <div class="col-md-4">
+                            <div class="text-center">
+                                <div class="h5 text-success">{{ prefs.media_preference.links }}</div>
+                                <small class="text-muted">链接内容</small>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            {% endif %}
+        </div>
+
+        <!-- 报告信息 -->
+        <div class="row mt-4">
+            <div class="col-12">
+                <div class="card">
+                    <div class="card-body">
+                        <h6 class="card-title">报告信息</h6>
+                        <p class="card-text">
+                            <small class="text-muted">
+                                生成时间: {{ report.timestamp }}<br>
+                                分析网址: <a href="{{ report.url }}" target="_blank">{{ report.url }}</a>
+                            </small>
+                        </p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.bundle.min.js"></script>
+</body>
+</html>
