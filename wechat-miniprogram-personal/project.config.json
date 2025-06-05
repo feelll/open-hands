@@ -41,7 +41,12 @@
   },
   "compileType": "miniprogram",
   "libVersion": "3.0.2",
-  "appid": "wx111e2c910275e57d",
+  "appid": "testAppId",
   "projectname": "space-shooter-miniprogram-personal",
-  "condition": {}
+  "condition": {},
+  "miniprogramRoot": "./",
+  "cloudfunctionRoot": "",
+  "watchOptions": {
+    "ignore": []
+  }
 }

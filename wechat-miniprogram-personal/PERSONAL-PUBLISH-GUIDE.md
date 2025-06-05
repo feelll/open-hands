@@ -85,11 +85,14 @@
    https://developers.weixin.qq.com/miniprogram/dev/devtools/download.html
    ```
 
-2. **创建项目**
+2. **导入项目**
    - 打开微信开发者工具
-   - 选择"小程序"项目
-   - 导入 `wechat-miniprogram-personal` 目录
-   - 输入您的AppID
+   - 点击"导入项目"
+   - 选择项目目录：`wechat-miniprogram-personal/`
+   - ⚠️ **重要**：项目类型手动选择"小程序"（不要选自动检测）
+   - 输入您的小程序AppID
+   
+   💡 **如果导入时自动切换到小游戏**，请查看 `IMPORT-TROUBLESHOOTING.md` 解决方案
 
 3. **修改项目配置**
    编辑 `project.config.json`：
