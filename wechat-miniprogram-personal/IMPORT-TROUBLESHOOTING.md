@@ -38,24 +38,40 @@
 
 5. **点击确定导入**
 
-### 方案二：使用简化配置文件
+### 方案二：使用一键修复脚本
 
-如果方案一不行，尝试使用简化的配置文件：
+我们提供了自动修复脚本：
 
-1. **备份原配置文件**
-   ```bash
-   mv project.config.json project.config.backup.json
-   ```
+#### Windows 用户
+```cmd
+# 双击运行或在命令提示符中执行
+fix-import.bat
+```
 
-2. **使用简化配置**
-   ```bash
-   mv project.config.simple.json project.config.json
-   ```
+#### Mac/Linux 用户
+```bash
+# 在终端中执行
+./fix-import.sh
+```
 
-3. **修改AppID**
-   在新的 `project.config.json` 中将 `"testAppId"` 替换为您的真实小程序AppID
+#### 手动修复（所有系统）
+如果不想运行脚本，可以手动执行：
 
-4. **重新导入项目**
+**Windows:**
+```cmd
+copy project.config.json project.config.backup.json
+copy project.config.simple.json project.config.json
+```
+
+**Mac/Linux:**
+```bash
+mv project.config.json project.config.backup.json
+mv project.config.simple.json project.config.json
+```
+
+**修改AppID**: 在新的 `project.config.json` 中将 `"testAppId"` 替换为您的真实小程序AppID
+
+💡 **Windows 用户详细指南**: 查看 `WINDOWS-GUIDE.md`
 
 ### 方案三：清理配置文件
 

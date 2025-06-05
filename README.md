@@ -98,7 +98,8 @@
    - 点击编译运行
    - 在模拟器或真机上体验
 
-📖 **详细发布指南**: 查看 `wechat-miniprogram-personal/PERSONAL-PUBLISH-GUIDE.md`
+📖 **详细发布指南**: 查看 `wechat-miniprogram-personal/PERSONAL-PUBLISH-GUIDE.md`  
+🪟 **Windows 用户**: 查看 `wechat-miniprogram-personal/WINDOWS-GUIDE.md`
 
 ### 🎮 微信小游戏版本 (企业开发者)
 
