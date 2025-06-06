@@ -7,47 +7,28 @@ import requests
 import time
 import logging
 from config import *
+from wechat_token_service import get_token_service
 
 class WeChatUploader:
     def __init__(self):
-        self.access_token = None
-        self.token_expires_at = 0
         self.setup_logging()
+        # 使用新的Token服务
+        self.token_service = get_token_service()
         
     def setup_logging(self):
         """设置日志"""
         self.logger = logging.getLogger(__name__)
         
     def get_access_token(self):
-        """获取微信公众号access_token"""
-        if not WECHAT_APPID or not WECHAT_SECRET:
-            self.logger.error("微信公众号配置不完整")
-            return None
-            
-        # 检查token是否过期
-        if self.access_token and time.time() < self.token_expires_at:
-            return self.access_token
-            
-        url = "https://api.weixin.qq.com/cgi-bin/token"
-        params = {
-            'grant_type': 'client_credential',
-            'appid': WECHAT_APPID,
-            'secret': WECHAT_SECRET
-        }
-        
+        """获取微信公众号access_token - 使用动态Token服务"""
         try:
-            response = requests.get(url, params=params)
-            data = response.json()
-            
-            if 'access_token' in data:
-                self.access_token = data['access_token']
-                self.token_expires_at = time.time() + data.get('expires_in', 7200) - 300  # 提前5分钟过期
-                self.logger.info("获取access_token成功")
-                return self.access_token
+            token = self.token_service.get_token_string()
+            if token:
+                self.logger.debug("通过Token服务获取access_token成功")
+                return token
             else:
-                self.logger.error(f"获取access_token失败: {data}")
+                self.logger.error("通过Token服务获取access_token失败")
                 return None
-                
         except Exception as e:
             self.logger.error(f"获取access_token异常: {e}")
             return None

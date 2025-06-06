@@ -25,9 +25,11 @@ CATEGORIES = {
 }
 
 # 微信公众号配置
+# 注意: 现在使用动态Token服务，不再需要手动配置WECHAT_ACCESS_TOKEN
+# Token会自动从微信API获取并缓存，类似Java RestTemplate的实现方式
 WECHAT_APPID = os.getenv('WECHAT_APPID', '')
 WECHAT_SECRET = os.getenv('WECHAT_SECRET', '')
-WECHAT_ACCESS_TOKEN = os.getenv('WECHAT_ACCESS_TOKEN', '')
+# WECHAT_ACCESS_TOKEN 已弃用 - 现在使用 wechat_token_service 动态获取
 
 # 请求头配置
 HEADERS = {
