@@ -391,34 +391,36 @@ class EnhancedImageScraper:
                 
             elif method == 'blur' or (method == 'auto' and not CV2_AVAILABLE):
                 # 方法2: 模糊右下角水印区域
-                # 创建蒙版，只处理右下角
-                mask_size = min(width // 4, height // 4, 150)  # 水印区域大小
+                # 扩大水印区域以完全覆盖水印（包括3G字样等）
+                mask_width = min(width // 3, 200)  # 水印宽度，扩大到1/3或200px
+                mask_height = min(height // 4, 120)  # 水印高度，保持1/4或120px
                 
-                # 提取右下角区域
+                # 提取右下角区域，确保完全覆盖水印
                 watermark_region = image.crop((
-                    width - mask_size, 
-                    height - mask_size, 
+                    width - mask_width, 
+                    height - mask_height, 
                     width, 
                     height
                 ))
                 
-                # 应用高斯模糊
-                blurred_region = watermark_region.filter(ImageFilter.GaussianBlur(radius=8))
+                # 应用更强的高斯模糊
+                blurred_region = watermark_region.filter(ImageFilter.GaussianBlur(radius=12))
                 
                 # 将模糊区域粘贴回原图
-                image.paste(blurred_region, (width - mask_size, height - mask_size))
+                image.paste(blurred_region, (width - mask_width, height - mask_height))
                 
             elif method == 'inpaint' and CV2_AVAILABLE:
                 # 方法3: 使用OpenCV的图像修复
                 image_array = np.array(image)
                 
-                # 创建水印蒙版（右下角区域）
+                # 创建水印蒙版（右下角区域），扩大覆盖范围
                 mask = np.zeros((height, width), dtype=np.uint8)
-                mask_size = min(width // 4, height // 4, 150)
-                mask[height-mask_size:height, width-mask_size:width] = 255
+                mask_width = min(width // 3, 200)  # 扩大宽度
+                mask_height = min(height // 4, 120)  # 保持高度
+                mask[height-mask_height:height, width-mask_width:width] = 255
                 
                 # 使用图像修复算法
-                result = cv2.inpaint(image_array, mask, 3, cv2.INPAINT_TELEA)
+                result = cv2.inpaint(image_array, mask, 5, cv2.INPAINT_TELEA)
                 image = Image.fromarray(result)
                 
             elif method == 'auto':
@@ -467,24 +469,27 @@ class EnhancedImageScraper:
             gray = np.mean(corner_array, axis=2)
             variance = np.var(gray)
             
-            # 根据方差确定水印区域大小
+            # 根据方差确定水印区域大小，扩大检测范围
             if variance > 1000:  # 高方差，可能有复杂水印
-                watermark_size = min(corner_size, 120)
+                watermark_width = min(width // 3, 200)
+                watermark_height = min(height // 4, 120)
             elif variance > 500:  # 中等方差
-                watermark_size = min(corner_size, 80)
+                watermark_width = min(width // 4, 150)
+                watermark_height = min(height // 5, 100)
             else:  # 低方差，可能是简单水印或无水印
-                watermark_size = min(corner_size, 50)
+                watermark_width = min(width // 5, 120)
+                watermark_height = min(height // 6, 80)
             
             return (
-                width - watermark_size,
-                height - watermark_size,
-                watermark_size,
-                watermark_size
+                width - watermark_width,
+                height - watermark_height,
+                watermark_width,
+                watermark_height
             )
             
         except Exception as e:
             self.logger.debug(f"水印检测失败: {e}")
-            # 返回默认右下角区域
+            # 返回默认右下角区域，使用更大的覆盖范围
             width, height = 800, 600  # 默认尺寸
             try:
                 image = Image.open(io.BytesIO(image_data))
@@ -492,8 +497,9 @@ class EnhancedImageScraper:
             except:
                 pass
             
-            default_size = min(width // 5, height // 5, 100)
-            return (width - default_size, height - default_size, default_size, default_size)
+            default_width = min(width // 3, 200)  # 默认宽度扩大
+            default_height = min(height // 4, 120)  # 默认高度扩大
+            return (width - default_width, height - default_height, default_width, default_height)
             
     def download_image(self, image_url, save_path, convert_webp=True, remove_watermark=True, watermark_method='auto'):
         """下载单张图片，支持WebP转JPG和去水印"""

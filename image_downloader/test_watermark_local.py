@@ -31,24 +31,33 @@ def create_test_image_with_watermark():
             color = (i % 255, j % 255, (i+j) % 255)
             draw.rectangle([i, j, i+40, j+40], fill=color)
     
-    # 在右下角添加水印
-    watermark_text = "WATERMARK"
+    # 在右下角添加更真实的水印（模拟3G字样等）
     try:
         # 尝试使用默认字体
         font = ImageFont.load_default()
     except:
         font = None
     
-    # 水印位置（右下角）
-    watermark_x = width - 150
-    watermark_y = height - 50
+    # 水印区域（右下角，更大范围）
+    watermark_width = 180
+    watermark_height = 80
+    watermark_x = width - watermark_width - 10
+    watermark_y = height - watermark_height - 10
     
-    # 绘制水印背景
-    draw.rectangle([watermark_x-10, watermark_y-10, width-10, height-10], 
-                  fill='white', outline='black', width=2)
+    # 绘制水印背景（半透明白色）
+    watermark_bg = Image.new('RGBA', (watermark_width, watermark_height), (255, 255, 255, 180))
+    watermark_draw = ImageDraw.Draw(watermark_bg)
     
-    # 绘制水印文字
-    draw.text((watermark_x, watermark_y), watermark_text, fill='red', font=font)
+    # 绘制多个水印元素（模拟真实水印）
+    watermark_draw.text((10, 10), "3G", fill=(255, 0, 0, 200), font=font)  # 红色3G
+    watermark_draw.text((40, 10), "BIZHI", fill=(0, 0, 255, 200), font=font)  # 蓝色BIZHI
+    watermark_draw.text((10, 35), "www.site.com", fill=(128, 128, 128, 200), font=font)  # 灰色网址
+    watermark_draw.text((10, 55), "WATERMARK", fill=(0, 128, 0, 200), font=font)  # 绿色水印
+    
+    # 将水印合成到主图片上
+    image_rgba = image.convert('RGBA')
+    image_rgba.paste(watermark_bg, (watermark_x, watermark_y), watermark_bg)
+    image = image_rgba.convert('RGB')
     
     # 保存测试图片
     test_image_path = "test_image_with_watermark.jpg"

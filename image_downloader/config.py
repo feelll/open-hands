@@ -45,7 +45,7 @@ HEADERS = {
 IMAGE_EXTENSIONS = ['.jpg', '.jpeg', '.png', '.gif', '.webp', '.bmp']
 
 # 最大下载图片数量（每个分类）
-MAX_IMAGES_PER_CATEGORY = 250  # 增加到250张，支持更多页面下载
+MAX_IMAGES_PER_CATEGORY = 5000  # 增加到5000张，支持完整分类下载（约20页）
 
 # 增强爬虫配置
 AUTO_DETECT_MAX_PAGES = True  # 自动检测最大页数
