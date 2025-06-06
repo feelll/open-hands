@@ -391,9 +391,9 @@ class EnhancedImageScraper:
                 
             elif method == 'blur' or (method == 'auto' and not CV2_AVAILABLE):
                 # 方法2: 模糊右下角水印区域
-                # 扩大水印区域以完全覆盖水印（包括3G字样等）
-                mask_width = min(width // 3, 200)  # 水印宽度，扩大到1/3或200px
-                mask_height = min(height // 4, 120)  # 水印高度，保持1/4或120px
+                # 进一步扩大水印区域，向左和向上扩展更多
+                mask_width = min(width // 2.5, 250)  # 水印宽度，扩大到2/5或250px（向左扩展更多）
+                mask_height = min(height // 3, 150)  # 水印高度，扩大到1/3或150px（向上扩展更多）
                 
                 # 提取右下角区域，确保完全覆盖水印
                 watermark_region = image.crop((
@@ -413,10 +413,10 @@ class EnhancedImageScraper:
                 # 方法3: 使用OpenCV的图像修复
                 image_array = np.array(image)
                 
-                # 创建水印蒙版（右下角区域），扩大覆盖范围
+                # 创建水印蒙版（右下角区域），进一步扩大覆盖范围
                 mask = np.zeros((height, width), dtype=np.uint8)
-                mask_width = min(width // 3, 200)  # 扩大宽度
-                mask_height = min(height // 4, 120)  # 保持高度
+                mask_width = min(width // 2.5, 250)  # 向左扩展更多
+                mask_height = min(height // 3, 150)  # 向上扩展更多
                 mask[height-mask_height:height, width-mask_width:width] = 255
                 
                 # 使用图像修复算法
@@ -469,16 +469,16 @@ class EnhancedImageScraper:
             gray = np.mean(corner_array, axis=2)
             variance = np.var(gray)
             
-            # 根据方差确定水印区域大小，扩大检测范围
+            # 根据方差确定水印区域大小，进一步扩大检测范围
             if variance > 1000:  # 高方差，可能有复杂水印
-                watermark_width = min(width // 3, 200)
-                watermark_height = min(height // 4, 120)
+                watermark_width = min(width // 2.5, 250)  # 向左扩展更多
+                watermark_height = min(height // 3, 150)  # 向上扩展更多
             elif variance > 500:  # 中等方差
-                watermark_width = min(width // 4, 150)
-                watermark_height = min(height // 5, 100)
+                watermark_width = min(width // 3, 200)
+                watermark_height = min(height // 3.5, 130)
             else:  # 低方差，可能是简单水印或无水印
-                watermark_width = min(width // 5, 120)
-                watermark_height = min(height // 6, 80)
+                watermark_width = min(width // 4, 150)
+                watermark_height = min(height // 4, 100)
             
             return (
                 width - watermark_width,
@@ -497,8 +497,8 @@ class EnhancedImageScraper:
             except:
                 pass
             
-            default_width = min(width // 3, 200)  # 默认宽度扩大
-            default_height = min(height // 4, 120)  # 默认高度扩大
+            default_width = min(width // 2.5, 250)  # 默认宽度进一步扩大（向左更多）
+            default_height = min(height // 3, 150)  # 默认高度进一步扩大（向上更多）
             return (width - default_width, height - default_height, default_width, default_height)
             
     def download_image(self, image_url, save_path, convert_webp=True, remove_watermark=True, watermark_method='auto'):
