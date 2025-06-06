@@ -62,18 +62,26 @@ class EnhancedImageScraper:
         # 查找分页链接的多种方式
         max_page = 1
         
-        # 方式1: 查找分页导航
-        pagination_patterns = [
-            r'index_(\d+)\.html',
-            r'page[_-]?(\d+)',
-            r'/(\d+)\.html'
-        ]
+        # 方式1: 查找分页导航中的index_数字.html模式
+        pagination_links = soup.find_all('a', href=re.compile(r'index_(\d+)\.html'))
+        for link in pagination_links:
+            href = link.get('href', '')
+            matches = re.findall(r'index_(\d+)\.html', href)
+            for match in matches:
+                try:
+                    page_num = int(match)
+                    max_page = max(max_page, page_num)
+                except ValueError:
+                    continue
         
-        for pattern in pagination_patterns:
-            links = soup.find_all('a', href=re.compile(pattern))
+        # 方式2: 查找分页导航区域
+        # 查找包含分页的div或ul元素
+        pagination_containers = soup.find_all(['div', 'ul'], class_=re.compile(r'page|pagination'))
+        for container in pagination_containers:
+            links = container.find_all('a', href=re.compile(r'index_(\d+)\.html'))
             for link in links:
                 href = link.get('href', '')
-                matches = re.findall(pattern, href)
+                matches = re.findall(r'index_(\d+)\.html', href)
                 for match in matches:
                     try:
                         page_num = int(match)
@@ -81,8 +89,8 @@ class EnhancedImageScraper:
                     except ValueError:
                         continue
         
-        # 方式2: 查找"下一页"或"最后一页"链接
-        next_page_texts = ['下一页', '下页', '末页', '最后一页', 'next', 'last']
+        # 方式3: 查找"下一页"或"最后一页"链接
+        next_page_texts = ['下一页', '下页', '末页', '最后一页', 'next', 'last', '尾页']
         for text in next_page_texts:
             links = soup.find_all('a', string=re.compile(text, re.I))
             for link in links:
@@ -95,17 +103,17 @@ class EnhancedImageScraper:
                     except ValueError:
                         continue
         
-        # 方式3: 尝试访问更高页数来确定边界
-        test_page = max_page + 1
-        while test_page <= max_page + 10:  # 最多测试10页
-            test_url = f"{category_url}index_{test_page}.html"
-            test_content = self.get_page_content(test_url)
-            if test_content and self.has_valid_content(test_content):
-                max_page = test_page
-                test_page += 1
-            else:
-                break
-                
+        # 方式4: 如果没有找到分页链接，尝试测试几页
+        if max_page == 1:
+            self.logger.info("未找到分页链接，尝试测试页面存在性")
+            for test_page in range(2, 6):  # 测试2-5页
+                test_url = f"{category_url}index_{test_page}.html"
+                test_content = self.get_page_content(test_url)
+                if test_content and self.has_valid_content(test_content):
+                    max_page = test_page
+                else:
+                    break
+                    
         self.logger.info(f"检测到最大页数: {max_page}")
         return max_page
         
@@ -210,9 +218,8 @@ class EnhancedImageScraper:
             pic_id = base_pic_match.group(1)
             base_url = detail_url.replace(f'pic{pic_id}.html', '')
             
-            # 尝试获取图片集中的所有图片（通常有2-10张）
-            consecutive_failures = 0
-            for i in range(2, 12):  # 从_2开始，尝试到_11
+            # 固定获取图片集中的所有图片（每个图块固定最多5张）
+            for i in range(2, 6):  # 从_2到_5，固定5张图片
                 sub_url = f"{base_url}pic{pic_id}_{i}.html"
                 
                 if sub_url in processed_urls:
@@ -222,16 +229,9 @@ class EnhancedImageScraper:
                 if sub_image:
                     all_image_urls.append(sub_image)
                     processed_urls.add(sub_url)
-                    consecutive_failures = 0  # 重置失败计数
                     self.logger.debug(f"找到子图片: pic{pic_id}_{i}")
-                else:
-                    consecutive_failures += 1
-                    # 如果连续2个失败，可能已经到达末尾
-                    if consecutive_failures >= 2:
-                        self.logger.debug(f"连续{consecutive_failures}个失败，停止尝试")
-                        break
                 
-                time.sleep(0.2)  # 短暂延迟避免请求过快
+                time.sleep(0.1)  # 短暂延迟避免请求过快
         
         # 去重并验证
         unique_urls = []
@@ -446,22 +446,31 @@ class EnhancedImageScraper:
         self.logger.info(f"分类 {category_name} 找到 {len(detail_urls)} 个图片详情页")
         
         downloaded_count = 0
+        processed_blocks = 0
         max_images = max_images or MAX_IMAGES_PER_CATEGORY
         
-        # 使用进度条
-        with tqdm(total=min(len(detail_urls), max_images), desc=f"下载{category_name}") as pbar:
+        # 计算预期图片数量（每个图块5张图片）
+        expected_images_per_block = 5
+        total_expected = len(detail_urls) * expected_images_per_block
+        
+        self.logger.info(f"预期下载图片数量: {len(detail_urls)} 个图块 × {expected_images_per_block} 张/块 = {total_expected} 张")
+        
+        # 使用进度条，显示图块进度
+        with tqdm(total=len(detail_urls), desc=f"下载{category_name}图块", unit="块") as pbar:
             for detail_url in detail_urls:
                 if downloaded_count >= max_images:
                     break
                     
-                # 获取详情页的所有图片
+                # 获取详情页的所有图片（固定5张）
                 image_urls = self.get_all_images_from_detail_page(detail_url)
                 
                 if not image_urls:
-                    self.logger.warning(f"详情页没有找到图片: {detail_url}")
+                    self.logger.warning(f"图块没有找到图片: {detail_url}")
+                    pbar.update(1)
                     continue
                 
-                # 下载该详情页的所有图片
+                block_downloaded = 0
+                # 下载该图块的所有图片
                 for i, image_url in enumerate(image_urls):
                     if downloaded_count >= max_images:
                         break
@@ -474,21 +483,34 @@ class EnhancedImageScraper:
                     # 检查文件是否已存在
                     if os.path.exists(save_path):
                         self.logger.debug(f"文件已存在，跳过: {filename}")
+                        block_downloaded += 1
+                        downloaded_count += 1
                         continue
                         
                     if self.download_image(image_url, save_path, convert_webp=True):
                         downloaded_count += 1
-                        self.logger.info(f"下载成功: {filename} (WebP→JPG)")
-                        pbar.update(1)
+                        block_downloaded += 1
+                        self.logger.debug(f"下载成功: {filename} (WebP→JPG)")
                     else:
                         self.logger.warning(f"下载失败: {filename}")
                         
                     time.sleep(DELAY_BETWEEN_REQUESTS)
-                    
-                # 详情页之间的延迟
-                time.sleep(DELAY_BETWEEN_REQUESTS * 0.5)
                 
-        self.logger.info(f"分类 {category_name} 下载完成，共下载 {downloaded_count} 张图片")
+                processed_blocks += 1
+                pbar.set_postfix({
+                    '已下载': f"{downloaded_count}张",
+                    '本块': f"{block_downloaded}/{len(image_urls)}张"
+                })
+                pbar.update(1)
+                    
+                # 图块之间的延迟
+                time.sleep(DELAY_BETWEEN_REQUESTS * 0.3)
+                
+        self.logger.info(f"分类 {category_name} 下载完成:")
+        self.logger.info(f"  处理图块: {processed_blocks}/{len(detail_urls)}")
+        self.logger.info(f"  下载图片: {downloaded_count} 张")
+        self.logger.info(f"  平均每块: {downloaded_count/processed_blocks:.1f} 张" if processed_blocks > 0 else "  平均每块: 0 张")
+        
         return downloaded_count
         
     def scrape_all_categories_enhanced(self, max_pages_per_category=None, max_images_per_category=None):
