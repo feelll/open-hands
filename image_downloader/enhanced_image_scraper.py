@@ -144,40 +144,45 @@ class EnhancedImageScraper:
                 
             soup = BeautifulSoup(content, 'html.parser')
             
-            # 查找图片详情页链接
-            image_links = []
+            # 重点查找 class="imgw" 的链接
+            imgw_links = soup.find_all('a', class_='imgw')
             
-            # 多种方式查找链接
-            patterns = [
-                r'/meinv/\w+/pic\d+\.html',
-                r'pic\d+\.html'
-            ]
-            
-            for pattern in patterns:
-                links = soup.find_all('a', href=re.compile(pattern))
-                image_links.extend(links)
-            
-            # 也查找class为特定值的链接
-            class_patterns = ['imgw', 'pic-item', 'image-link']
-            for class_name in class_patterns:
-                links = soup.find_all('a', class_=class_name)
-                image_links.extend(links)
+            if not imgw_links:
+                # 备用方案：查找其他可能的链接
+                patterns = [
+                    r'/meinv/\w+/pic\d+\.html',
+                    r'pic\d+\.html'
+                ]
                 
-            if not image_links:
+                imgw_links = []
+                for pattern in patterns:
+                    links = soup.find_all('a', href=re.compile(pattern))
+                    imgw_links.extend(links)
+                
+                # 也查找其他class
+                class_patterns = ['pic-item', 'image-link']
+                for class_name in class_patterns:
+                    links = soup.find_all('a', class_=class_name)
+                    imgw_links.extend(links)
+                
+            if not imgw_links:
                 self.logger.warning(f"页面 {page} 没有找到图片链接")
                 continue
                 
             page_urls = []
-            for link in image_links:
+            for link in imgw_links:
                 href = link.get('href')
-                if href:
+                if href and 'pic' in href and '.html' in href:
                     if href.startswith('http'):
                         full_url = href
                     else:
                         full_url = urljoin(category_url, href)
-                    if full_url not in all_detail_urls:
-                        all_detail_urls.append(full_url)
-                        page_urls.append(full_url)
+                    
+                    # 只添加主图片页面（不包含_数字的）
+                    if not re.search(r'pic\d+_\d+\.html', full_url):
+                        if full_url not in all_detail_urls:
+                            all_detail_urls.append(full_url)
+                            page_urls.append(full_url)
                         
             self.logger.info(f"页面 {page} 找到 {len(page_urls)} 个新的图片详情页")
             time.sleep(DELAY_BETWEEN_REQUESTS)
@@ -186,53 +191,92 @@ class EnhancedImageScraper:
         return all_detail_urls
         
     def get_all_images_from_detail_page(self, detail_url):
-        """从详情页获取所有图片URL（包括分页的图片）"""
+        """从详情页获取所有图片URL（包括图片集中的所有图片）"""
         self.logger.debug(f"解析详情页: {detail_url}")
         
         all_image_urls = []
+        processed_urls = set()
         
-        # 获取主页面
-        content = self.get_page_content(detail_url)
-        if not content:
-            return []
-            
-        soup = BeautifulSoup(content, 'html.parser')
+        # 获取主页面图片
+        main_image = self.extract_wallphotos_image(detail_url)
+        if main_image:
+            all_image_urls.append(main_image)
+            processed_urls.add(detail_url)
         
-        # 获取主图片
-        main_images = self.extract_images_from_page(soup, detail_url)
-        all_image_urls.extend(main_images)
-        
-        # 查找图片集中的其他图片链接
-        # 查找类似 pic2192_1.html, pic2192_2.html 的链接
-        base_pic_id = re.search(r'pic(\d+)', detail_url)
-        if base_pic_id:
-            pic_id = base_pic_id.group(1)
+        # 查找图片集中的其他图片
+        # 从URL中提取pic ID，如pic2192 -> 2192
+        base_pic_match = re.search(r'pic(\d+)\.html', detail_url)
+        if base_pic_match:
+            pic_id = base_pic_match.group(1)
+            base_url = detail_url.replace(f'pic{pic_id}.html', '')
             
-            # 查找同组图片链接
-            sub_image_links = soup.find_all('a', href=re.compile(f'pic{pic_id}_\\d+\\.html'))
-            
-            for sub_link in sub_image_links:
-                sub_href = sub_link.get('href')
-                if sub_href:
-                    if not sub_href.startswith('http'):
-                        sub_href = urljoin(detail_url, sub_href)
+            # 尝试获取图片集中的所有图片（通常有2-10张）
+            consecutive_failures = 0
+            for i in range(2, 12):  # 从_2开始，尝试到_11
+                sub_url = f"{base_url}pic{pic_id}_{i}.html"
+                
+                if sub_url in processed_urls:
+                    continue
                     
-                    # 获取子页面的图片
-                    sub_content = self.get_page_content(sub_href)
-                    if sub_content:
-                        sub_soup = BeautifulSoup(sub_content, 'html.parser')
-                        sub_images = self.extract_images_from_page(sub_soup, sub_href)
-                        all_image_urls.extend(sub_images)
-                        time.sleep(0.5)  # 短暂延迟
+                sub_image = self.extract_wallphotos_image(sub_url)
+                if sub_image:
+                    all_image_urls.append(sub_image)
+                    processed_urls.add(sub_url)
+                    consecutive_failures = 0  # 重置失败计数
+                    self.logger.debug(f"找到子图片: pic{pic_id}_{i}")
+                else:
+                    consecutive_failures += 1
+                    # 如果连续2个失败，可能已经到达末尾
+                    if consecutive_failures >= 2:
+                        self.logger.debug(f"连续{consecutive_failures}个失败，停止尝试")
+                        break
+                
+                time.sleep(0.2)  # 短暂延迟避免请求过快
         
-        # 去重
+        # 去重并验证
         unique_urls = []
         for url in all_image_urls:
-            if url not in unique_urls and self.is_valid_image_url(url):
+            if url and url not in unique_urls and self.is_valid_image_url(url):
                 unique_urls.append(url)
                 
-        self.logger.debug(f"详情页 {detail_url} 找到 {len(unique_urls)} 张图片")
+        self.logger.info(f"详情页 {detail_url} 找到 {len(unique_urls)} 张图片")
         return unique_urls
+        
+    def extract_wallphotos_image(self, page_url):
+        """从页面中提取 wallphotos 图片URL"""
+        try:
+            content = self.get_page_content(page_url)
+            if not content:
+                return None
+                
+            soup = BeautifulSoup(content, 'html.parser')
+            
+            # 查找 class="img-table-cell wallphotos" 中的图片
+            wallphotos_div = soup.find('div', class_='img-table-cell wallphotos')
+            if wallphotos_div:
+                img_tag = wallphotos_div.find('img')
+                if img_tag:
+                    img_src = img_tag.get('src')
+                    if img_src and self.is_valid_image_url(img_src):
+                        if not img_src.startswith('http'):
+                            img_src = urljoin(page_url, img_src)
+                        return img_src
+            
+            # 备用方案：查找其他可能的图片
+            # 查找包含 uploadmark 或 uploads 的图片URL
+            img_tags = soup.find_all('img')
+            for img in img_tags:
+                src = img.get('src')
+                if src and ('uploadmark' in src or 'uploads' in src) and self.is_valid_image_url(src):
+                    if not src.startswith('http'):
+                        src = urljoin(page_url, src)
+                    return src
+            
+            return None
+            
+        except Exception as e:
+            self.logger.debug(f"提取图片失败 {page_url}: {e}")
+            return None
         
     def extract_images_from_page(self, soup, base_url):
         """从页面提取图片URL"""
@@ -343,18 +387,45 @@ class EnhancedImageScraper:
             self.logger.error(f"下载图片失败 {image_url}: {e}")
             return False
             
-    def get_image_filename(self, image_url, index=0):
-        """生成图片文件名"""
+    def get_image_filename(self, image_url, detail_url=None, sub_index=None):
+        """生成有意义的图片文件名"""
         parsed_url = urlparse(image_url)
-        filename = os.path.basename(parsed_url.path)
+        original_filename = os.path.basename(parsed_url.path)
         
-        if not filename or '.' not in filename:
-            # 如果无法从URL获取文件名，使用索引
-            filename = f"image_{index:04d}.jpg"
-        else:
+        # 尝试从详情页URL提取pic ID
+        pic_id = None
+        if detail_url:
+            pic_match = re.search(r'pic(\d+)', detail_url)
+            if pic_match:
+                pic_id = pic_match.group(1)
+        
+        # 如果有原始文件名且包含有效信息
+        if original_filename and '.' in original_filename:
+            name, ext = os.path.splitext(original_filename)
+            
             # 如果是webp格式，改为jpg
-            if filename.lower().endswith('.webp'):
-                filename = filename[:-5] + '.jpg'
+            if ext.lower() == '.webp':
+                ext = '.jpg'
+            
+            # 如果有pic ID，添加到文件名前缀
+            if pic_id:
+                if sub_index is not None:
+                    filename = f"pic{pic_id}_{sub_index}_{name}{ext}"
+                else:
+                    filename = f"pic{pic_id}_{name}{ext}"
+            else:
+                filename = f"{name}{ext}"
+        else:
+            # 无法从URL获取文件名，使用pic ID生成
+            if pic_id:
+                if sub_index is not None:
+                    filename = f"pic{pic_id}_{sub_index}.jpg"
+                else:
+                    filename = f"pic{pic_id}.jpg"
+            else:
+                # 最后备用方案
+                timestamp = int(time.time())
+                filename = f"image_{timestamp}.jpg"
         
         return filename
         
@@ -386,11 +457,18 @@ class EnhancedImageScraper:
                 # 获取详情页的所有图片
                 image_urls = self.get_all_images_from_detail_page(detail_url)
                 
-                for image_url in image_urls:
+                if not image_urls:
+                    self.logger.warning(f"详情页没有找到图片: {detail_url}")
+                    continue
+                
+                # 下载该详情页的所有图片
+                for i, image_url in enumerate(image_urls):
                     if downloaded_count >= max_images:
                         break
-                        
-                    filename = self.get_image_filename(image_url, downloaded_count)
+                    
+                    # 生成有意义的文件名
+                    sub_index = i + 1 if len(image_urls) > 1 else None
+                    filename = self.get_image_filename(image_url, detail_url, sub_index)
                     save_path = os.path.join(save_dir, filename)
                     
                     # 检查文件是否已存在
