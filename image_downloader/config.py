@@ -45,4 +45,11 @@ HEADERS = {
 IMAGE_EXTENSIONS = ['.jpg', '.jpeg', '.png', '.gif', '.webp', '.bmp']
 
 # 最大下载图片数量（每个分类）
-MAX_IMAGES_PER_CATEGORY = 5
+MAX_IMAGES_PER_CATEGORY = 50
+
+# 增强爬虫配置
+AUTO_DETECT_MAX_PAGES = True  # 自动检测最大页数
+CONVERT_WEBP_TO_JPG = True    # 自动转换WebP为JPG
+MAX_PAGES_PER_CATEGORY = None # 每个分类最大页数，None表示自动检测
+DOWNLOAD_RETRY_TIMES = 3      # 下载重试次数
+PAGE_DETECTION_LIMIT = 20     # 页数检测上限
