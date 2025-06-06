@@ -1,0 +1,30 @@
+[
+  {
+    "code": "mnzp",
+    "name": "美女照片",
+    "max_pages": 2,
+    "theme": "清新",
+    "delay": 60
+  },
+  {
+    "code": "xgmn",
+    "name": "性感美女",
+    "max_pages": 1,
+    "theme": "性感",
+    "delay": 90
+  },
+  {
+    "code": "ktmn",
+    "name": "可爱美女",
+    "max_pages": 1,
+    "theme": "可爱",
+    "delay": 60
+  },
+  {
+    "code": "fj",
+    "name": "风景图片",
+    "max_pages": 1,
+    "theme": "自然",
+    "delay": 60
+  }
+]
