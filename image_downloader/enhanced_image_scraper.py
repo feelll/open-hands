@@ -10,8 +10,15 @@ from urllib.parse import urljoin, urlparse
 from bs4 import BeautifulSoup
 from tqdm import tqdm
 import logging
-from PIL import Image
+from PIL import Image, ImageFilter, ImageEnhance
 import io
+import numpy as np
+try:
+    import cv2
+    CV2_AVAILABLE = True
+except ImportError:
+    CV2_AVAILABLE = False
+    print("⚠️ OpenCV未安装，将使用基础去水印方法")
 from config import *
 
 class EnhancedImageScraper:
@@ -353,8 +360,143 @@ class EnhancedImageScraper:
             self.logger.error(f"WebP转JPG失败: {e}")
             return image_data  # 返回原始数据
             
-    def download_image(self, image_url, save_path, convert_webp=True):
-        """下载单张图片，支持WebP转JPG"""
+    def remove_watermark(self, image_data, method='crop'):
+        """
+        去除图片水印
+        
+        Args:
+            image_data: 图片二进制数据
+            method: 去水印方法 ('crop', 'inpaint', 'blur', 'auto')
+        
+        Returns:
+            处理后的图片二进制数据
+        """
+        try:
+            # 打开图片
+            image = Image.open(io.BytesIO(image_data))
+            
+            # 转换为RGB模式（如果需要）
+            if image.mode != 'RGB':
+                image = image.convert('RGB')
+            
+            width, height = image.size
+            
+            if method == 'crop':
+                # 方法1: 裁剪右下角（最简单有效）
+                # 使用配置中的裁剪比例
+                crop_ratio = getattr(self, 'crop_ratio', WATERMARK_CROP_RATIO)
+                crop_width = int(width * crop_ratio)
+                crop_height = int(height * crop_ratio)
+                image = image.crop((0, 0, crop_width, crop_height))
+                
+            elif method == 'blur' or (method == 'auto' and not CV2_AVAILABLE):
+                # 方法2: 模糊右下角水印区域
+                # 创建蒙版，只处理右下角
+                mask_size = min(width // 4, height // 4, 150)  # 水印区域大小
+                
+                # 提取右下角区域
+                watermark_region = image.crop((
+                    width - mask_size, 
+                    height - mask_size, 
+                    width, 
+                    height
+                ))
+                
+                # 应用高斯模糊
+                blurred_region = watermark_region.filter(ImageFilter.GaussianBlur(radius=8))
+                
+                # 将模糊区域粘贴回原图
+                image.paste(blurred_region, (width - mask_size, height - mask_size))
+                
+            elif method == 'inpaint' and CV2_AVAILABLE:
+                # 方法3: 使用OpenCV的图像修复
+                image_array = np.array(image)
+                
+                # 创建水印蒙版（右下角区域）
+                mask = np.zeros((height, width), dtype=np.uint8)
+                mask_size = min(width // 4, height // 4, 150)
+                mask[height-mask_size:height, width-mask_size:width] = 255
+                
+                # 使用图像修复算法
+                result = cv2.inpaint(image_array, mask, 3, cv2.INPAINT_TELEA)
+                image = Image.fromarray(result)
+                
+            elif method == 'auto':
+                # 自动选择最佳方法
+                if CV2_AVAILABLE:
+                    return self.remove_watermark(image_data, 'inpaint')
+                else:
+                    return self.remove_watermark(image_data, 'blur')
+            
+            # 保存处理后的图片
+            output = io.BytesIO()
+            image.save(output, format='JPEG', quality=95)
+            return output.getvalue()
+            
+        except Exception as e:
+            self.logger.error(f"去水印失败: {e}")
+            return image_data  # 返回原始数据
+            
+    def detect_watermark_area(self, image_data):
+        """
+        智能检测水印区域
+        
+        Returns:
+            (x, y, width, height) 水印区域坐标
+        """
+        try:
+            image = Image.open(io.BytesIO(image_data))
+            if image.mode != 'RGB':
+                image = image.convert('RGB')
+                
+            width, height = image.size
+            
+            # 分析右下角区域的特征
+            corner_size = min(width // 3, height // 3, 200)
+            corner_region = image.crop((
+                width - corner_size,
+                height - corner_size,
+                width,
+                height
+            ))
+            
+            # 转换为numpy数组进行分析
+            corner_array = np.array(corner_region)
+            
+            # 计算颜色方差，水印区域通常颜色变化较大
+            gray = np.mean(corner_array, axis=2)
+            variance = np.var(gray)
+            
+            # 根据方差确定水印区域大小
+            if variance > 1000:  # 高方差，可能有复杂水印
+                watermark_size = min(corner_size, 120)
+            elif variance > 500:  # 中等方差
+                watermark_size = min(corner_size, 80)
+            else:  # 低方差，可能是简单水印或无水印
+                watermark_size = min(corner_size, 50)
+            
+            return (
+                width - watermark_size,
+                height - watermark_size,
+                watermark_size,
+                watermark_size
+            )
+            
+        except Exception as e:
+            self.logger.debug(f"水印检测失败: {e}")
+            # 返回默认右下角区域
+            width, height = 800, 600  # 默认尺寸
+            try:
+                image = Image.open(io.BytesIO(image_data))
+                width, height = image.size
+            except:
+                pass
+            
+            default_size = min(width // 5, height // 5, 100)
+            return (width - default_size, height - default_size, default_size, default_size)
+            
+    def download_image(self, image_url, save_path, convert_webp=True, remove_watermark=True, watermark_method='auto'):
+        """下载单张图片，支持WebP转JPG和去水印"""
         try:
             response = self.session.get(image_url, timeout=30, stream=True)
             response.raise_for_status()
@@ -373,6 +515,11 @@ class EnhancedImageScraper:
                 # 更改文件扩展名为.jpg
                 if save_path.lower().endswith('.webp'):
                     save_path = save_path[:-5] + '.jpg'
+            
+            # 去除水印
+            if remove_watermark:
+                self.logger.debug(f"去除水印: {os.path.basename(save_path)}")
+                image_data = self.remove_watermark(image_data, method=watermark_method)
             
             # 确保目录存在
             os.makedirs(os.path.dirname(save_path), exist_ok=True)
@@ -487,10 +634,10 @@ class EnhancedImageScraper:
                         downloaded_count += 1
                         continue
                         
-                    if self.download_image(image_url, save_path, convert_webp=True):
+                    if self.download_image(image_url, save_path, convert_webp=True, remove_watermark=True, watermark_method='auto'):
                         downloaded_count += 1
                         block_downloaded += 1
-                        self.logger.debug(f"下载成功: {filename} (WebP→JPG)")
+                        self.logger.debug(f"下载成功: {filename} (WebP→JPG + 去水印)")
                     else:
                         self.logger.warning(f"下载失败: {filename}")
                         

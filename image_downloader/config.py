@@ -53,3 +53,8 @@ CONVERT_WEBP_TO_JPG = True    # 自动转换WebP为JPG
 MAX_PAGES_PER_CATEGORY = None # 每个分类最大页数，None表示自动检测
 DOWNLOAD_RETRY_TIMES = 3      # 下载重试次数
 PAGE_DETECTION_LIMIT = 20     # 页数检测上限
+
+# 去水印配置
+REMOVE_WATERMARK = True       # 是否去除水印
+WATERMARK_METHOD = 'auto'     # 去水印方法: 'crop', 'blur', 'inpaint', 'auto'
+WATERMARK_CROP_RATIO = 0.9    # 裁剪方法的保留比例（0.9表示裁剪掉10%）
